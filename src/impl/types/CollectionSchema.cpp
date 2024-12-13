@@ -15,7 +15,7 @@
 // limitations under the License.
 
 #include "milvus/types/CollectionSchema.h"
-
+#include "../TypeUtils.h"
 #include <algorithm>
 
 namespace milvus {
@@ -90,7 +90,7 @@ CollectionSchema::AnnsFieldNames() const {
     std::unordered_set<std::string> ret;
     for (const auto& field : fields_) {
         auto data_type = field.FieldDataType();
-        if (data_type == DataType::BINARY_VECTOR || data_type == DataType::FLOAT_VECTOR) {
+        if (IsVectorType(data_type)) {
             ret.emplace(field.Name());
         }
     }
