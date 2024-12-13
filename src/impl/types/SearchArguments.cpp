@@ -118,74 +118,58 @@ SearchArguments::SetExpression(std::string expression) {
 
 FieldDataPtr
 SearchArguments::TargetVectors() const {
-    if (binary_vectors_ != nullptr) {
-        return binary_vectors_;
-    } else if (float_vectors_ != nullptr) {
-        return float_vectors_;
-    }
-
-    return nullptr;
+    return field_data_;
 }
 
-Status
-SearchArguments::AddTargetVector(std::string field_name, const std::string& vector) {
-    return AddTargetVector(std::move(field_name), std::string{vector});
-}
+template Status
+SearchArguments::AddTargetVector<BinaryVecFieldData>(std::string field_name, const std::vector<uint8_t>& vector);
+TemplateAddTargetVectorDeclaration(, FloatVecFieldData);
+TemplateAddTargetVectorDeclaration(, BinaryVecFieldData);
 
+template <class VecFieldDataT>
 Status
 SearchArguments::AddTargetVector(std::string field_name, const std::vector<uint8_t>& vector) {
-    return AddTargetVector(std::move(field_name), milvus::BinaryVecFieldData::CreateBinaryString(vector));
+    // keep consistent with other AddTargetVector functions
+    static_assert(std::is_same<BinaryVecFieldData, VecFieldDataT>::value, "Only BinaryVecFieldData is supported");
+    return AddTargetVector<VecFieldDataT>(std::move(field_name), std::move(VecFieldDataT::CreateBinaryString(vector)));
 }
 
+template <class VecFieldDataT>
 Status
-SearchArguments::AddTargetVector(std::string field_name, std::string&& vector) {
-    if (float_vectors_ != nullptr) {
-        return {StatusCode::INVALID_AGUMENT, "Target vector must be float type!"};
+SearchArguments::AddTargetVector(std::string field_name, const typename VecFieldDataT::ElementT& vector) {
+    static_assert(
+        std::is_same<FloatVecFieldData, VecFieldDataT>::value || std::is_same<BinaryVecFieldData, VecFieldDataT>::value,
+        "Only FloatVecFieldData or BinaryVecFieldData is supported");
+    if (nullptr == field_data_) {
+        field_data_ = std::make_shared<VecFieldDataT>(std::move(field_name));
     }
 
-    if (nullptr == binary_vectors_) {
-        binary_vectors_ = std::make_shared<BinaryVecFieldData>(std::move(field_name));
-    }
-
-    auto code = binary_vectors_->Add(std::move(vector));
-    if (code != StatusCode::OK) {
-        return {code, "Failed to add vector"};
+    if (auto vectors = std::dynamic_pointer_cast<VecFieldDataT>(field_data_)) {
+        auto code = vectors->Add(vector);
+        if (code != StatusCode::OK) {
+            return {code, "Failed to add vector"};
+        }
+    } else {
+        return {StatusCode::INVALID_AGUMENT, "Invalid vector type!"};
     }
 
     return Status::OK();
 }
 
+template <class VecFieldDataT>
 Status
-SearchArguments::AddTargetVector(std::string field_name, const FloatVecFieldData::ElementT& vector) {
-    if (binary_vectors_ != nullptr) {
-        return {StatusCode::INVALID_AGUMENT, "Target vector must be binary type!"};
+SearchArguments::AddTargetVector(std::string field_name, typename VecFieldDataT::ElementT&& vector) {
+    if (nullptr == field_data_) {
+        field_data_ = std::make_shared<VecFieldDataT>(std::move(field_name));
     }
 
-    if (nullptr == float_vectors_) {
-        float_vectors_ = std::make_shared<FloatVecFieldData>(std::move(field_name));
-    }
-
-    auto code = float_vectors_->Add(vector);
-    if (code != StatusCode::OK) {
-        return {code, "Failed to add vector"};
-    }
-
-    return Status::OK();
-}
-
-Status
-SearchArguments::AddTargetVector(std::string field_name, FloatVecFieldData::ElementT&& vector) {
-    if (binary_vectors_ != nullptr) {
-        return {StatusCode::INVALID_AGUMENT, "Target vector must be binary type!"};
-    }
-
-    if (nullptr == float_vectors_) {
-        float_vectors_ = std::make_shared<FloatVecFieldData>(std::move(field_name));
-    }
-
-    auto code = float_vectors_->Add(std::move(vector));
-    if (code != StatusCode::OK) {
-        return {code, "Failed to add vector"};
+    if (auto vectors = std::dynamic_pointer_cast<VecFieldDataT>(field_data_)) {
+        auto code = vectors->Add(std::move(vector));
+        if (code != StatusCode::OK) {
+            return {code, "Failed to add vector"};
+        }
+    } else {
+        return {StatusCode::INVALID_AGUMENT, "Invalid vector type!"};
     }
 
     return Status::OK();

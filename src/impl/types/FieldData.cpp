@@ -16,6 +16,13 @@
 
 #include "milvus/types/FieldData.h"
 
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include "milvus/types/DataType.h"
+#include "milvus/types/FloatUtils.h"
+
 namespace milvus {
 
 namespace {
@@ -119,62 +126,61 @@ FieldData<T, Dt>::Data() {
     return data_;
 }
 
-BinaryVecFieldData::BinaryVecFieldData() : FieldData<std::string, DataType::BINARY_VECTOR>() {
+template <DataType Dt>
+BinaryVecFieldDataImpl<Dt>::BinaryVecFieldDataImpl() : FieldData<std::string, Dt>() {
 }
 
-BinaryVecFieldData::BinaryVecFieldData(std::string name)
-    : FieldData<std::string, DataType::BINARY_VECTOR>(std::move(name)) {
+template <DataType Dt>
+BinaryVecFieldDataImpl<Dt>::BinaryVecFieldDataImpl(std::string name) : FieldData<std::string, Dt>(std::move(name)) {
 }
 
-BinaryVecFieldData::BinaryVecFieldData(std::string name, const std::vector<std::string>& data)
-    : FieldData<std::string, DataType::BINARY_VECTOR>(std::move(name), data) {
+template <DataType Dt>
+BinaryVecFieldDataImpl<Dt>::BinaryVecFieldDataImpl(std::string name, const std::vector<std::string>& data)
+    : FieldData<std::string, Dt>(std::move(name), data) {
 }
 
-BinaryVecFieldData::BinaryVecFieldData(std::string name, std::vector<std::string>&& data)
-    : FieldData<std::string, DataType::BINARY_VECTOR>(std::move(name), std::move(data)) {
+template <DataType Dt>
+BinaryVecFieldDataImpl<Dt>::BinaryVecFieldDataImpl(std::string name, std::vector<std::string>&& data)
+    : FieldData<std::string, Dt>(std::move(name), std::move(data)) {
 }
 
-BinaryVecFieldData::BinaryVecFieldData(std::string name, const std::vector<std::vector<uint8_t>>& data)
-    : FieldData<std::string, DataType::BINARY_VECTOR>(std::move(name), CreateBinaryStrings(data)) {
+template <DataType Dt>
+BinaryVecFieldDataImpl<Dt>::BinaryVecFieldDataImpl(std::string name, const std::vector<std::vector<uint8_t>>& data)
+    : FieldData<std::string, Dt>(std::move(name), CreateBinaryStrings(data)) {
 }
 
-const std::vector<std::string>&
-BinaryVecFieldData::Data() const {
-    return data_;
-}
-
-std::vector<std::string>&
-BinaryVecFieldData::Data() {
-    return data_;
-}
-
+template <DataType Dt>
 std::vector<std::vector<uint8_t>>
-BinaryVecFieldData::DataAsUnsignedChars() const {
+BinaryVecFieldDataImpl<Dt>::DataAsUnsignedChars() const {
     std::vector<std::vector<uint8_t>> ret;
-    ret.reserve(data_.size());
-    for (const auto& item : data_) {
+    ret.reserve(this->data_.size());
+    for (const auto& item : this->data_) {
         ret.emplace_back(item.begin(), item.end());
     }
     return ret;
 }
 
+template <DataType Dt>
 StatusCode
-BinaryVecFieldData::Add(const std::string& element) {
-    return AddElement<std::string, DataType::BINARY_VECTOR>(element, data_);
+BinaryVecFieldDataImpl<Dt>::Add(const std::string& element) {
+    return AddElement<std::string, Dt>(element, this->data_);
 }
 
+template <DataType Dt>
 StatusCode
-BinaryVecFieldData::Add(std::string&& element) {
-    return AddElement<std::string, DataType::BINARY_VECTOR>(element, data_);
+BinaryVecFieldDataImpl<Dt>::Add(std::string&& element) {
+    return AddElement<std::string, Dt>(element, this->data_);
 }
 
+template <DataType Dt>
 StatusCode
-BinaryVecFieldData::Add(const std::vector<uint8_t>& element) {
+BinaryVecFieldDataImpl<Dt>::Add(const std::vector<uint8_t>& element) {
     return Add(std::string{element.begin(), element.end()});
 }
 
+template <DataType Dt>
 std::vector<std::string>
-BinaryVecFieldData::CreateBinaryStrings(const std::vector<std::vector<uint8_t>>& data) {
+BinaryVecFieldDataImpl<Dt>::CreateBinaryStrings(const std::vector<std::vector<uint8_t>>& data) {
     std::vector<std::string> ret;
     ret.reserve(data.size());
     for (const auto& item : data) {
@@ -183,9 +189,111 @@ BinaryVecFieldData::CreateBinaryStrings(const std::vector<std::vector<uint8_t>>&
     return ret;
 }
 
+template <DataType Dt>
 std::string
-BinaryVecFieldData::CreateBinaryString(const std::vector<uint8_t>& data) {
+BinaryVecFieldDataImpl<Dt>::CreateBinaryString(const std::vector<uint8_t>& data) {
     return std::string{data.begin(), data.end()};
+}
+
+template <typename Fp16T, DataType Dt>
+Fp16VecFieldData<Fp16T, Dt>::Fp16VecFieldData(std::string name, const std::vector<std::vector<Fp16T>>& data)
+    : Fp16VecFieldData<Fp16T, Dt>(std::move(name), CreateBinaryStringsFromFloats(data)) {
+}
+
+template <typename Fp16T, DataType Dt>
+Fp16VecFieldData<Fp16T, Dt>::Fp16VecFieldData(std::string name, std::vector<std::vector<Fp16T>>&& data)
+    : Fp16VecFieldData<Fp16T, Dt>(std::move(name), CreateBinaryStringsFromFloats(std::move(data))) {
+}
+
+template <typename Fp16T, DataType Dt>
+Fp16VecFieldData<Fp16T, Dt>::Fp16VecFieldData(std::string name, const std::vector<std::vector<float>>& data)
+    : Fp16VecFieldData<Fp16T, Dt>(std::move(name), CreateBinaryStringsFromFloats(data)) {
+}
+
+template <typename Fp16T, DataType Dt>
+Fp16VecFieldData<Fp16T, Dt>::Fp16VecFieldData(std::string name, const std::vector<std::vector<double>>& data)
+    : Fp16VecFieldData<Fp16T, Dt>(std::move(name), CreateBinaryStringsFromFloats(data)) {
+}
+
+template <typename Fp16T, DataType Dt>
+template <typename T>
+std::vector<std::vector<T>>
+Fp16VecFieldData<Fp16T, Dt>::DataAsFloats() const {
+    static_assert(std::is_same_v<Fp16T, Eigen::half> || std::is_same_v<Fp16T, Eigen::bfloat16>,
+                  "Fp16T should be Eigen::half or Eigen::bfloat16");
+    std::vector<std::vector<T>> result;
+    result.reserve(this->data_.size());
+    for (const typename Fp16VecFieldData<Fp16T, Dt>::ElementT& str : this->data_) {
+        if constexpr (std::is_same_v<Fp16T, Eigen::half>) {
+            std::vector<T> float_vec = CreateFloatVecFromFp16Bytes<Fp16T, T>(str);
+            result.push_back(std::move(float_vec));
+        }
+    }
+    return result;
+}
+
+template <typename Fp16T, typename FloatT>
+struct FloatVecToBytesTrait;
+
+template <>
+struct FloatVecToBytesTrait<Eigen::half, Eigen::half> {
+    static std::string
+    Convert(const std::vector<Eigen::half>& data) {
+        return Fp16VecToBytes(data);
+    }
+};
+
+template <>
+struct FloatVecToBytesTrait<Eigen::half, float> {
+    static std::string
+    Convert(const std::vector<float>& data) {
+        return FloatToFp16Bytes(data);
+    }
+};
+
+template <>
+struct FloatVecToBytesTrait<Eigen::half, double> {
+    static std::string
+    Convert(const std::vector<double>& data) {
+        return DoubleToFp16Bytes(data);
+    }
+};
+
+template <>
+struct FloatVecToBytesTrait<Eigen::bfloat16, Eigen::bfloat16> {
+    static std::string
+    Convert(const std::vector<Eigen::bfloat16>& data) {
+        return Bf16VecToBytes(data);
+    }
+};
+
+template <>
+struct FloatVecToBytesTrait<Eigen::bfloat16, float> {
+    static std::string
+    Convert(const std::vector<float>& data) {
+        return FloatToBf16Bytes(data);
+    }
+};
+
+template <>
+struct FloatVecToBytesTrait<Eigen::bfloat16, double> {
+    static std::string
+    Convert(const std::vector<double>& data) {
+        return DoubleToBf16Bytes(data);
+    }
+};
+
+template <typename Fp16T, DataType Dt>
+template <typename FloatT>
+std::vector<std::string>
+Fp16VecFieldData<Fp16T, Dt>::CreateBinaryStringsFromFloats(const std::vector<std::vector<FloatT>>& data) {
+    std::vector<std::string> result;
+    result.reserve(data.size());
+    for (const auto& item : data) {
+        std::string bytes = FloatVecToBytesTrait<Fp16T, FloatT>::Convert(item);
+        result.push_back(std::move(bytes));
+    }
+    return result;
 }
 
 // explicit declare FieldData
@@ -199,5 +307,7 @@ template class FieldData<double, DataType::DOUBLE>;
 template class FieldData<std::string, DataType::VARCHAR>;
 template class FieldData<std::string, DataType::BINARY_VECTOR>;
 template class FieldData<std::vector<float>, DataType::FLOAT_VECTOR>;
+template class Fp16VecFieldData<Eigen::bfloat16, DataType::BFLOAT16_VECTOR>;
+template class Fp16VecFieldData<Eigen::half, DataType::FLOAT16_VECTOR>;
 
 }  // namespace milvus

@@ -87,34 +87,25 @@ class SearchArguments {
     TargetVectors() const;
 
     /**
-     * @brief Add a binary vector to search
-     */
-    Status
-    AddTargetVector(std::string field_name, const std::string& vector);
-
-    /**
      * @brief Add a binary vector to search with uint8_t vectors
      */
+    template <class VecFieldDataT>
     Status
     AddTargetVector(std::string field_name, const std::vector<uint8_t>& vector);
 
     /**
-     * @brief Add a binary vector to search
+     * @brief Add a vector to search
      */
+    template <class VecFieldDataT>
     Status
-    AddTargetVector(std::string field_name, std::string&& vector);
+    AddTargetVector(std::string field_name, const typename VecFieldDataT::ElementT& vector);
 
     /**
-     * @brief Add a float vector to search
+     * @brief Add a vector to search
      */
+    template <class VecFieldDataT>
     Status
-    AddTargetVector(std::string field_name, const FloatVecFieldData::ElementT& vector);
-
-    /**
-     * @brief Add a float vector to search
-     */
-    Status
-    AddTargetVector(std::string field_name, FloatVecFieldData::ElementT&& vector);
+    AddTargetVector(std::string field_name, typename VecFieldDataT::ElementT&& vector);
 
     /**
      * @brief Get travel timestamp.
@@ -253,9 +244,7 @@ class SearchArguments {
     std::set<std::string> partition_names_;
     std::set<std::string> output_field_names_;
     std::string filter_expression_;
-
-    BinaryVecFieldDataPtr binary_vectors_;
-    FloatVecFieldDataPtr float_vectors_;
+    FieldDataPtr field_data_;
 
     std::set<std::string> output_fields_;
     std::unordered_map<std::string, int64_t> extra_params_;
@@ -271,5 +260,17 @@ class SearchArguments {
     bool range_search_{false};
     ::milvus::MetricType metric_type_{::milvus::MetricType::L2};
 };
+
+extern template Status
+SearchArguments::AddTargetVector<BinaryVecFieldData>(std::string field_name, const std::vector<uint8_t>& vector);
+
+#define TemplateAddTargetVectorDeclaration(E, VecFieldDataT)                                                           \
+    E template Status SearchArguments::AddTargetVector<VecFieldDataT>(std::string field_name,                          \
+                                                                      const typename VecFieldDataT::ElementT& vector); \
+    E template Status SearchArguments::AddTargetVector<VecFieldDataT>(std::string field_name,                          \
+                                                                      typename VecFieldDataT::ElementT && vector);
+
+TemplateAddTargetVectorDeclaration(extern, FloatVecFieldData);
+TemplateAddTargetVectorDeclaration(extern, BinaryVecFieldData);
 
 }  // namespace milvus

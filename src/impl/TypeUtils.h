@@ -24,6 +24,7 @@
 #include "milvus/types/IndexType.h"
 #include "milvus/types/MetricType.h"
 #include "milvus/types/SegmentInfo.h"
+
 namespace milvus {
 
 bool
@@ -55,6 +56,12 @@ operator==(const proto::schema::FieldData& lhs, const BinaryVecFieldData& rhs);
 
 bool
 operator==(const proto::schema::FieldData& lhs, const FloatVecFieldData& rhs);
+
+bool
+operator==(const proto::schema::FieldData& lhs, const Float16VecFieldData& rhs);
+
+bool
+operator==(const proto::schema::FieldData& lhs, const BFloat16VecFieldData& rhs);
 
 bool
 operator==(const proto::schema::FieldData& lhs, const proto::schema::FieldData& rhs);
@@ -91,6 +98,12 @@ CreateProtoFieldData(const BinaryVecFieldData& field);
 
 proto::schema::VectorField*
 CreateProtoFieldData(const FloatVecFieldData& field);
+
+proto::schema::VectorField*
+CreateProtoFieldData(const Float16VecFieldData& field);
+
+proto::schema::VectorField*
+CreateProtoFieldData(const BFloat16VecFieldData& field);
 
 proto::schema::ScalarField*
 CreateProtoFieldData(const BoolFieldData& field);

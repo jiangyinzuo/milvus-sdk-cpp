@@ -666,6 +666,51 @@ MilvusClientImpl::Delete(const std::string& collection_name, const std::string& 
                                                                                    post);
 }
 
+template <DataType Dt>
+struct SearchTrait;
+
+template <>
+struct SearchTrait<DataType::BINARY_VECTOR> {
+    static constexpr proto::common::PlaceholderType type = proto::common::PlaceholderType::BinaryVector;
+    using FieldDataType = BinaryVecFieldData;
+    static constexpr size_t size_of_element = sizeof(uint8_t);
+};
+
+template <>
+struct SearchTrait<DataType::FLOAT_VECTOR> {
+    static constexpr proto::common::PlaceholderType type = proto::common::PlaceholderType::FloatVector;
+    using FieldDataType = FloatVecFieldData;
+    static constexpr size_t size_of_element = sizeof(float);
+};
+
+template <>
+struct SearchTrait<DataType::FLOAT16_VECTOR> {
+    static constexpr proto::common::PlaceholderType type = proto::common::PlaceholderType::Float16Vector;
+    using FieldDataType = Float16VecFieldData;
+    static constexpr size_t size_of_element = sizeof(Eigen::half);
+    static_assert(sizeof(Eigen::half) == 2, "Eigen::half size is not 2");
+};
+
+template <>
+struct SearchTrait<DataType::BFLOAT16_VECTOR> {
+    static constexpr proto::common::PlaceholderType type = proto::common::PlaceholderType::BFloat16Vector;
+    using FieldDataType = BFloat16VecFieldData;
+    static constexpr size_t size_of_element = sizeof(Eigen::bfloat16);
+    static_assert(sizeof(Eigen::bfloat16) == 2, "Eigen::bfloat16 size is not 2");
+};
+
+template <DataType Dt>
+static void
+SetPlaceHolderValue(proto::common::PlaceholderValue& placeholder_value, FieldDataPtr target) {
+    placeholder_value.set_type(SearchTrait<Dt>::type);
+    auto& vec = dynamic_cast<typename SearchTrait<Dt>::BinaryVecFieldData&>(*target);
+    for (const auto& v : vec.Data()) {
+        std::string placeholder_data(reinterpret_cast<const char*>(v.data()),
+                                     v.size() * SearchTrait<Dt>::size_of_element);
+        placeholder_value.add_values(std::move(placeholder_data));
+    }
+}
+
 Status
 MilvusClientImpl::Search(const SearchArguments& arguments, SearchResults& results, int timeout) {
     std::string anns_field;
@@ -706,23 +751,21 @@ MilvusClientImpl::Search(const SearchArguments& arguments, SearchResults& result
         auto& placeholder_value = *placeholder_group.add_placeholders();
         placeholder_value.set_tag("$0");
         auto target = arguments.TargetVectors();
-        if (target->Type() == DataType::BINARY_VECTOR) {
-            // bins
-            placeholder_value.set_type(proto::common::PlaceholderType::BinaryVector);
-            auto& bins_vec = dynamic_cast<BinaryVecFieldData&>(*target);
-            for (const auto& bins : bins_vec.Data()) {
-                std::string placeholder_data(reinterpret_cast<const char*>(bins.data()), bins.size());
-                placeholder_value.add_values(std::move(placeholder_data));
-            }
-        } else {
-            // floats
-            placeholder_value.set_type(proto::common::PlaceholderType::FloatVector);
-            auto& floats_vec = dynamic_cast<FloatVecFieldData&>(*target);
-            for (const auto& floats : floats_vec.Data()) {
-                std::string placeholder_data(reinterpret_cast<const char*>(floats.data()),
-                                             floats.size() * sizeof(float));
-                placeholder_value.add_values(std::move(placeholder_data));
-            }
+        switch (target->Type()) {
+            case DataType::BINARY_VECTOR:
+                SetPlaceHolderValue<DataType::BINARY_VECTOR>(placeholder_value, target);
+                break;
+            case DataType::FLOAT_VECTOR:
+                SetPlaceHolderValue<DataType::FLOAT_VECTOR>(placeholder_value, target);
+                break;
+            case DataType::FLOAT16_VECTOR:
+                SetPlaceHolderValue<DataType::FLOAT16_VECTOR>(placeholder_value, target);
+                break;
+            case DataType::BFLOAT16_VECTOR:
+                SetPlaceHolderValue<DataType::BFLOAT16_VECTOR>(placeholder_value, target);
+                break;
+            default:
+                assert(false);
         }
         rpc_request.set_placeholder_group(std::move(placeholder_group.SerializeAsString()));
 
@@ -839,8 +882,7 @@ MilvusClientImpl::CalcDistance(const CalcDistanceArguments& arguments, DistanceA
 
                 if (arg_vectors->Type() == DataType::FLOAT_VECTOR) {
                     FloatVecFieldDataPtr data_ptr = std::static_pointer_cast<FloatVecFieldData>(arg_vectors);
-                    auto float_vectors = data_array->mutable_float_vector();
-                    auto mutable_data = float_vectors->mutable_data();
+                    auto mutable_data = data_array->mutable_float_vector()->mutable_data();
                     auto& vectors = data_ptr->Data();
                     for (auto& vector : vectors) {
                         mutable_data->Add(vector.begin(), vector.end());
